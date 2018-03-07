@@ -25,17 +25,22 @@ int main(int argc, char *argv[]) {
     std::cout << "Unable to open the bus: " << strerror(errno) << std::endl;
     return 1;
   }
-  
+
   SI7021::SI7021 hyrg(i2cfd);
-  //MPL3115A2::MPL3115A2 baro(i2cfd);
+  MPL3115A2::MPL3115A2 baro(i2cfd);
 
   for (int i =0; i< 1000; i++) {
+    sample::sample s;
+    baro.Initiate();
     hyrg.Initiate();
-    //baro.Initiate();
-    auto hsamp = hyrg.Sample();
-    //auto bsamp = baro.Sample();
-    std::cout << hsamp.JSON();
-    //std::cout << bsamp.JSON();
+    if (hyrg.Sample(s) != 0) {
+      std::cout << "Sample error (hyrg)" << strerror(errno) << std::endl;
+    };
+
+    if (baro.Sample(s) != 0) {
+      std::cout << "Sample error (baro)" << strerror(errno) << std::endl;
+    };
+    std::cout << s.json();
   }
   close(i2cfd);
 }

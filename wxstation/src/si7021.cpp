@@ -1,21 +1,8 @@
 #include "si7021.hpp"
 
-
 namespace pt = boost::posix_time;
 
 namespace SI7021 {
-
-  /*This creates one with some useful values*/
-  HumiditySample::HumiditySample( char rhMSB, char rhLSB, char tempMSB, char tempLSB ): HumiditySample() {
-    humidity = ( ( ( rhMSB * 256 + rhLSB ) * 125.0 ) / 65536.0 ) - 6;
-    temperature = ( ( ( tempMSB * 256 + tempLSB ) * 175.72 ) / 65536.0 ) - 46.85;
-  }
-
-  std::string HumiditySample::JSON() {
-    std::stringstream ss;
-    ss << "{ \"when\":\"" << timez::RFC3399Nano( when ) << "\",\"humidity\":" << humidity << ",\"temperature\":" << temperature << "}" << std::endl;
-    return ss.str();
-  }
 
   /*SI7021 extracts measurements from a i2c bound SI7021 device.
 
@@ -41,10 +28,10 @@ namespace SI7021 {
   We also set the  SI7021::PT_DATA_CFG registry to 0x07
 
   */
-  SI7021::SI7021( int fd, char regVal ): i2cfd( fd ), reg( regVal ), sampleInit()  {
+  SI7021::SI7021( int fd, char regVal ) : i2cfd( fd ), reg( regVal ), sampleInit() {
     select();
     char config[] = {WRITE_USR_REG, regVal};
-    write( i2cfd, config, 2 ); //set register
+    write( i2cfd, config, 2 ); // set register
   }
 
   /*Make sure the kernel knows we are talking to dev 0x60.*/
@@ -61,39 +48,50 @@ namespace SI7021 {
    * */
   void SI7021::Initiate() {
     select();
+    // read (and discard) from MEAS_RH_NOHOLD sand then issue start
     char discarded[] = {MEAS_RH_NOHOLD, 0};
-    std::cout << "RD" << write( i2cfd, discarded, 1 ) << std::endl; //read (and discard) from CTRL_REG1 sand then issue start
+    write( i2cfd, discarded, 1 );
     sampleInit = timez::now();
   }
 
   /*A Sample takes at least 23 ms  ~10.8 for the T, 12 for RH*/
-  HumiditySample SI7021::Sample() {
+  int SI7021::Sample( sample::sample &samp ) {
+    char d[] = {0, 0, 0};
+    pt::ptime start;
+    pt::time_duration max = pt::milliseconds( 50 );
     int rd;
-    pt::time_duration atleast = pt::milliseconds( 200 );
-    while ( 1 ) {
-      pt::time_duration elapsed = ( timez::now() - sampleInit );
-      if ( elapsed > atleast ) break;
-    }
+
+    // Read the data
     select();
-
-    //Read the data
-    char d[] = {0, 0, 0, 0};
-    rd = read(i2cfd, d, 2);
-    if (rd != 2 ) {
-      return HumiditySample();
+    start = timez::now();
+    while ( timez::now() - start < max && rd != 2 ) {
+      rd = read( i2cfd, d, 2 );
+      if ( rd == 2 ) {
+        samp.humidity = ( ( ( d[0] * 256 + d[1] ) * 125.0 ) / 65536.0 ) - 6;
+      }
     }
 
-   select(); 
-   char w[] = {MEAS_T_NOHOLD};
-   rd = -1;
-   while (rd != 1) {
-      rd = write( i2cfd, w, 1 ); //just fetch the last measured t
-   }
 
-    rd = -1;
-    while (rd == -1) {
-      rd = read(i2cfd, d+2, 2);
+    select();
+    rd = 0;
+    char w[] = {MEAS_T_NOHOLD};
+    start = timez::now();
+    while ( timez::now() - start < max && rd != 1 ) {
+      rd = write( i2cfd, w, 1 );
     }
-    return HumiditySample( d[0], d[1], d[2], d[3] );
+    if ( rd != 1 ) {
+      return rd;
+    }
+
+    rd = 0;
+    start = timez::now();
+    while ( timez::now() - start < max && rd != 2 ) {
+      rd = read( i2cfd, d, 2 );
+      if ( rd == 2 ) {
+        samp.htemperature = ( ( ( d[0] * 256 + d[1] ) * 175.72 ) / 65536.0 ) - 46.85;
+        return 0;
+      }
+    }
+    return rd;
   }
-};
+};  // namespace SI7021

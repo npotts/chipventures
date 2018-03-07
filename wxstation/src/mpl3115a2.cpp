@@ -1,23 +1,8 @@
 #include "mpl3115a2.hpp"
 
-
 namespace pt = boost::posix_time;
 
 namespace MPL3115A2 {
-
-  /*This creates one with some useful values*/
-  BarometerSample::BarometerSample( unsigned char baroMSB, unsigned char baroCSB, unsigned char baroLSB, unsigned char tempMSB, unsigned char tempLSB ): BarometerSample() {
-    pressure = ( double )( ( baroMSB * ( 1 << 16 ) ) + ( baroCSB * ( 1 << 8 ) ) + ( baroLSB & 0xF0 ) ) / 16.0; //
-    pressure /= 400.0; // get it into mBar / hPa, not kPa
-    temperature = ( double )( ( tempMSB * 256 ) + ( tempLSB & 0xF1 ) ) / 16;
-    temperature /= 16; //???
-  }
-
-  std::string BarometerSample::JSON() {
-    std::stringstream ss;
-    ss << "{ \"when\":\"" << timez::RFC3399Nano( when ) << "\",\"pressure\":" << pressure << ",\"temperature\":" << temperature << "}" << std::endl;
-    return ss.str();
-  }
 
   /*MPL3115A2 extracts measurements from a i2c bound MPL3115A2 device.
 
@@ -27,8 +12,9 @@ namespace MPL3115A2 {
   6     RESERVED
   5:3   Oversample Ratio (see below)
   2     Reset (set to zero)
-  1     OST   Initialize measurement immediately.  If SBYB=0, writing a 1 means the devie starts a measurement.  Might need to reread this at some point
-  0     SBYB  If 1, it auto-measureses into a FIFO buffer. 0 means you
+  1     OST   Initialize measurement immediately.  If SBYB=0, writing a 1 means
+  the devie starts a measurement.  Might need to reread this at some point 0 SBYB
+  If 1, it auto-measureses into a FIFO buffer. 0 means you
 
 
   Oversample Ratio:
@@ -47,12 +33,13 @@ namespace MPL3115A2 {
   We also set the  MPL3115A2::PT_DATA_CFG registry to 0x07
 
   */
-  MPL3115A2::MPL3115A2( int fd, char reg1Val ): i2cfd( fd ), reg1( reg1Val ), sampleInit()  {
+  MPL3115A2::MPL3115A2( int fd, char reg1Val )
+    : i2cfd( fd ), reg1( reg1Val ), sampleInit() {
     select();
     char config[] = {CTRL_REG1, reg1Val};
-    write( i2cfd, config, 2 ); //set register
+    write( i2cfd, config, 2 ); // set register
 
-    //set the flag register
+    // set the flag register
     char flags[] = {PT_DATA_CFG, 0x07};
     write( i2cfd, flags, 2 );
   }
@@ -69,30 +56,52 @@ namespace MPL3115A2 {
   void MPL3115A2::Initiate() {
     select();
     char discarded[] = {CTRL_REG1};
-    write( i2cfd, discarded, 1 ); //read (and discard) from CTRL_REG1 sand then issue start
-    read( i2cfd, discarded, 1 ); //discard read, which resets sample state
+    // read (and discard) from CTRL_REG1 sand then issue start
+    write( i2cfd, discarded, 1 );
+
+    // discard read, which resets sample state
+    read( i2cfd, discarded, 1 );
 
     char config[] = {CTRL_REG1, 0x1A};
-    write( i2cfd, config, 2 ); //set registeri
+    write( i2cfd, config, 2 ); // set registeri
     sampleInit = timez::now();
   }
 
-  BarometerSample MPL3115A2::Sample() {
+  int MPL3115A2::Sample( sample::sample &samp ) {
+    int rd = 0;
+    pt::ptime start;
+    pt::time_duration max = pt::milliseconds( 70 );
     pt::time_duration atleast = pt::milliseconds( 335 );
     while ( 1 ) {
       pt::time_duration elapsed = ( timez::now() - sampleInit );
       if ( elapsed > atleast ) break;
     }
 
-    //Read the data
+    // Read the data
+    select();
+    start = timez::now();
     char w[] = {STATUS};
-    write( i2cfd, w , 1 ); //start from the status reg, and read from there to 6:
-    char d[6] = {0, 0, 0, 0, 0, 0};
-    if ( read( i2cfd, d, 6 ) != 6 ) {
-      // throw std::runtime_error("Expected to read 6 characters, and I didnt");
-      return BarometerSample();
+    while ( timez::now() - start < max && rd != 1 ) {
+      rd = write( i2cfd, w, 1 ); // start from the status reg, and read from there to 6:
     }
-    return BarometerSample( d[1], d[2], d[3], d[4], d[5] );
-  }
+    if ( rd != 1 ) {
+      return rd;
+    }
 
-};
+    rd = 0;
+    start = timez::now();
+    unsigned char d[6] = {0, 0, 0, 0, 0, 0};
+    while ( timez::now() - start < max ) {
+      rd = read( i2cfd, d, 6 );
+      if ( rd == 6 && ( d[0] & 0x08 ) ) {
+        samp.pressure = ( double )( ( d[1] * ( 1 << 16 ) ) + ( d[2] * ( 1 << 8 ) ) +
+                                    ( d[3] & 0xF0 ) ) / 16.0;
+        samp.pressure /= 400.0;  // get it into mBar / hPa, not kPa
+        samp.ptemperature = ( double )( ( d[4] * 256 ) + ( d[5] & 0xF1 ) ) / 16.0;
+        samp.ptemperature /= 16;  //???
+        return 0;
+      }
+    }
+    return rd;
+  }
+};  // namespace MPL3115A2

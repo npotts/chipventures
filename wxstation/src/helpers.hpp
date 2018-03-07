@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cmath>
 #include <string>
+#include <iomanip>
 #include <iostream>
 #include <boost/date_time/local_time/local_time.hpp>
 #include <boost/date_time/date_facet.hpp>
@@ -18,5 +20,24 @@ namespace timez {
 
   /*spinlock does nothing for the time asked for (in ms)
    * */
-  void spinlock(int ms);
+  void spinlock( int ms );
 };
+
+
+namespace sample {
+  /* sample is a sample in time representing some sort of wx station measurement. */
+  class sample {
+    public:
+      sample(): pressure( NAN ), ptemperature( NAN ), humidity( NAN ), htemperature( NAN ), airtemperature( NAN ), when( timez::now() ) {} //broken values
+      std::string json();
+      std::string  csv();
+      double pressure;
+      double ptemperature;
+      double humidity;
+      double htemperature;
+      double airtemperature;
+    private:
+      std::string nullforNan( double );
+      pt::ptime when;
+  };
+}

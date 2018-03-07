@@ -36,22 +36,6 @@ namespace MPL3115A2 {
     CTRL_REG5 = 0x2A
   };
 
-
-  /* Barometer Sample represents a Pressure and Temperature sample
-   *
-  */
-  class BarometerSample {
-    public:
-      BarometerSample(): when( timez::now() ), pressure( NAN ), temperature( NAN ) {} //broken values
-      BarometerSample( unsigned char baroMSB, unsigned char baroCSB, unsigned char baroLSB, unsigned char tempMSB, unsigned char tempLSB );
-      std::string JSON();
-    private:
-      pt::ptime when;
-      double pressure;
-      double temperature;
-  };
-
-
   /*
    class MPL3115A2 wraps around a i2c file descriptor,
    configurex it */
@@ -59,7 +43,7 @@ namespace MPL3115A2 {
     public:
       MPL3115A2( int i2cfd, char reg1 = 0x1A );
       void Initiate(); //starts a sample
-      BarometerSample Sample(); //retrieve final sample
+      int Sample( sample::sample &samp ); //retrieve final sample, return non-zero error
     private:
       void select(); //select this I2C device
       int i2cfd;

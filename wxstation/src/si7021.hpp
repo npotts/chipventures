@@ -39,22 +39,6 @@ namespace SI7021 {
     FIRMWARE_2 = 0xB8
   };
 
-
-  /* Barometer Sample represents a Pressure and Temperature sample
-   *
-  */
-  class HumiditySample {
-    public:
-      HumiditySample(): when( timez::now() ), humidity( NAN ), temperature( NAN ) {} //broken values
-      HumiditySample( char rhMSB,  char rhLSB,   char tempMSB,  char tempLSB );
-      std::string JSON();
-    private:
-      pt::ptime when;
-      double humidity;
-      double temperature;
-  };
-
-
   /*
    class SI7021 wraps around a i2c file descriptor,
    configurex it */
@@ -62,7 +46,8 @@ namespace SI7021 {
     public:
       SI7021( int i2cfd, char reg = 0x1A );
       void Initiate(); //starts a sample
-      HumiditySample Sample(); //retrieve final sample
+      int Sample( sample::sample &samp ); //retrieve final sample
+
     private:
       void select(); //select this I2C device
       int i2cfd;
