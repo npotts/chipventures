@@ -44,7 +44,7 @@ namespace sample {
   std::string sample::nullforNan( double val ) {
     if ( std::isnan( val ) ) return "null";
     std::stringstream ss;
-    ss << std::setprecision( 2 ) << val;
+    ss << val;
     return ss.str();
   }
 
