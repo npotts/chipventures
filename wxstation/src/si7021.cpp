@@ -54,7 +54,7 @@ namespace wxstation {
   */
   SI7021::SI7021( int fd, char regVal ) : i2cfd( fd ), reg( regVal ), sampleInit() {
     select();
-    char config[] = {si7021::WRITE_USR_REG, regVal};
+    char config[] = {(char) si7021::WRITE_USR_REG, regVal};
     write( i2cfd, config, 2 ); // set register
   }
 
@@ -73,7 +73,7 @@ namespace wxstation {
   void SI7021::Initiate() {
     select();
     // read (and discard) from MEAS_RH_NOHOLD sand then issue start
-    char discarded[] = {si7021::MEAS_RH_NOHOLD, 0};
+    char discarded[] = {(char)si7021::MEAS_RH_NOHOLD, 0};
     write( i2cfd, discarded, 1 );
     sampleInit = now();
   }
@@ -98,7 +98,7 @@ namespace wxstation {
 
     select();
     rd = 0;
-    char w[] = {si7021::MEAS_T_NOHOLD};
+    char w[] = {(char) si7021::MEAS_T_NOHOLD};
     start = now();
     while ( now() - start < max && rd != 1 ) {
       rd = write( i2cfd, w, 1 );

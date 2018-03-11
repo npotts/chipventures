@@ -63,7 +63,7 @@ int DS18B20::Sample( sample &samp ) {
     std::getline(dev, lines[0]);
     std::getline(dev, lines[1]);
     dev.close();
-    unsigned int eql = lines[1].find("=");
+    auto  eql = lines[1].find("=");
     if (lines[0].find("YES") == std::string::npos || //bad CRC
         eql == std::string::npos) //malformed output
       return 1;
