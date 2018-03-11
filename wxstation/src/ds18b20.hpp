@@ -25,61 +25,37 @@ SOFTWARE.
 #pragma once
 
 #include <iostream>
-#include <sstream>      // std::stringstream, std::stringbuf
-#include <stdexcept>
-#include <cstdio>
-#include <unistd.h>
-#include <stdlib.h>
-#include <linux/i2c-dev.h>
-#include <sys/ioctl.h>
-#include <fcntl.h>
-#include <cmath>
-#include <iomanip>
-#include <cstring> //for strerr
+#include <fstream>      // std::stringstream, std::stringbuf
 #include <string>
+#define BOOST_FILESYSTEM_NO_DEPRECATED 1
+#include <boost/filesystem.hpp>
+#include <iostream>
 
 #include "helpers.hpp"
 
-namespace pt = boost::posix_time;
+namespace fs = boost::filesystem;
 
 namespace wxstation {
 
-namespace si7021 {
-  enum Registers {
-    MEAS_RH_HOLD = 0xE5,
-    MEAS_RH_NOHOLD = 0xF5,
-    MEAS_T_HOLD = 0xE3,
-    MEAS_T_NOHOLD = 0xF3,
-    READ_LAST_T = 0xE0,
-    RESET = 0xFE,
-    WRITE_USR_REG = 0xE6,
-    READ_USR_REG = 0xE7,
-    WRITE_HEATER_REG = 0x51,
-    READ_HEATER_REG = 0x11,
-    //the following are odd 1 byte cmd codes
-    READ_ID_HIGHBYTE_1 = 0xFA,
-    READ_ID_HIGHBYTE_2 = 0x0F,
-    READ_ID_LOWBYTE_1 = 0xFC,
-    READ_ID_LOWBYTE_2 = 0xC9,
-    FIRMWARE_1 = 0x84,
-    FIRMWARE_2 = 0xB8
-  };
-}; //end si7021
-
 /*
- class SI7021 wraps around a i2c file descriptor,
- configurex it */
-class SI7021 {
-  public:
-    SI7021( int i2cfd, char reg = 0x1A );
-    void Initiate(); //starts a sample
-    int Sample( sample &samp ); //retrieve final sample
+class DS18B20 wraps around the /sys/bus/w1/driver/w1_slave_driver interface
+and reads temperature values from a DS18B20. This class is dumb.  It expects only
+one temp sensor, and blindly parses what it is looking for.
+*/
+class DS18B20 {
+public:
+  DS18B20(std::string sensorID = "", std::string w1root = "/sys/bus/w1/drivers/w1_slave_driver"): id(sensorID), root(w1root) {
+    if (id == "") detect();
+  }
+  void Initiate(); //start reading data by opening file
+  int Sample( sample &samp ); //patch sample in
 
-  private:
-    void select(); //select this I2C device
-    int i2cfd;
-    char reg;
-    pt::ptime sampleInit;
-}; //end class
+private:
+  void detect(); //looks for a the first 1wire temp device
+  std::string id;
+  fs::path root;
+  std::ifstream dev;
+};
+
 
 }; //namespace wxstation

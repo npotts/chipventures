@@ -1,8 +1,32 @@
+/*
+MIT License
+
+Copyright (c) 2018 Nick Potts
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 #include "si7021.hpp"
 
 namespace pt = boost::posix_time;
 
-namespace SI7021 {
+namespace wxstation {
 
   /*SI7021 extracts measurements from a i2c bound SI7021 device.
 
@@ -30,7 +54,7 @@ namespace SI7021 {
   */
   SI7021::SI7021( int fd, char regVal ) : i2cfd( fd ), reg( regVal ), sampleInit() {
     select();
-    char config[] = {WRITE_USR_REG, regVal};
+    char config[] = {si7021::WRITE_USR_REG, regVal};
     write( i2cfd, config, 2 ); // set register
   }
 
@@ -49,13 +73,13 @@ namespace SI7021 {
   void SI7021::Initiate() {
     select();
     // read (and discard) from MEAS_RH_NOHOLD sand then issue start
-    char discarded[] = {MEAS_RH_NOHOLD, 0};
+    char discarded[] = {si7021::MEAS_RH_NOHOLD, 0};
     write( i2cfd, discarded, 1 );
-    sampleInit = timez::now();
+    sampleInit = now();
   }
 
   /*A Sample takes at least 23 ms  ~10.8 for the T, 12 for RH*/
-  int SI7021::Sample( sample::sample &samp ) {
+  int SI7021::Sample( sample &samp ) {
     char d[] = {0, 0, 0};
     pt::ptime start;
     pt::time_duration max = pt::milliseconds( 50 );
@@ -63,8 +87,8 @@ namespace SI7021 {
 
     // Read the data
     select();
-    start = timez::now();
-    while ( timez::now() - start < max && rd != 2 ) {
+    start = now();
+    while ( now() - start < max && rd != 2 ) {
       rd = read( i2cfd, d, 2 );
       if ( rd == 2 ) {
         samp.humidity = ( ( ( d[0] * 256 + d[1] ) * 125.0 ) / 65536.0 ) - 6;
@@ -74,9 +98,9 @@ namespace SI7021 {
 
     select();
     rd = 0;
-    char w[] = {MEAS_T_NOHOLD};
-    start = timez::now();
-    while ( timez::now() - start < max && rd != 1 ) {
+    char w[] = {si7021::MEAS_T_NOHOLD};
+    start = now();
+    while ( now() - start < max && rd != 1 ) {
       rd = write( i2cfd, w, 1 );
     }
     if ( rd != 1 ) {
@@ -84,8 +108,8 @@ namespace SI7021 {
     }
 
     rd = 0;
-    start = timez::now();
-    while ( timez::now() - start < max && rd != 2 ) {
+    start = now();
+    while ( now() - start < max && rd != 2 ) {
       rd = read( i2cfd, d, 2 );
       if ( rd == 2 ) {
         samp.htemperature = ( ( ( d[0] * 256 + d[1] ) * 175.72 ) / 65536.0 ) - 46.85;
@@ -94,4 +118,4 @@ namespace SI7021 {
     }
     return rd;
   }
-};  // namespace SI7021
+};  // namespace wxstation

@@ -22,44 +22,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#pragma once
 
-#include <cmath>
-#include <string>
-#include <iomanip>
-#include <iostream>
-#include <boost/date_time/local_time/local_time.hpp>
-#include <boost/date_time/date_facet.hpp>
+#include "station.hpp"
 
-namespace pt = boost::posix_time;
 
 namespace wxstation {
-  /*Gets the current date/time*/
-  pt::ptime now();
 
-  /*RFC3399Nano returns a string representaton of the passed time.. EG like
-   * 2006-01-02T15:04:05.999999999Z07:00
-   * */
-  std::string RFC3399Nano( pt::ptime );
-
-
-  /*spinlock does nothing for the time asked for (in ms)
-   * */
-  void spinlock( int ms );
-
-  /* sample is a sample in time representing some sort of wx station measurement. */
-  class sample {
-    public:
-      sample(): pressure( NAN ), ptemperature( NAN ), humidity( NAN ), htemperature( NAN ), airtemperature( NAN ), when( now() ) {} //broken values
-      std::string json();
-      std::string  csv();
-      double pressure;
-      double ptemperature;
-      double humidity;
-      double htemperature;
-      double airtemperature;
-    private:
-      std::string nullforNan( double );
-      pt::ptime when;
-  };
+int openDevice(std::string path) {
+  std::cout << "Attempting to open " << path << std::endl;
+  int fd = open(path.c_str(), O_RDWR);
+  if (fd < 0) {
+    throw ("Unable to open the bus"); // + strerror(errno));
+  }
+  return fd;
 }
+
+sample WxStation::Measure() {
+  sample samp;
+  thermometer.Initiate();
+  barometer.Initiate();
+  hyrgrometer.Initiate();
+
+  if (hyrgrometer.Sample(samp) != 0)      std::cerr << "Sample error (hyrgrometer)" << strerror(errno) << std::endl;
+  if (barometer.Sample(samp) != 0) std::cerr << "Sample error (barometer)" << strerror(errno) << std::endl;
+  if (thermometer.Sample(samp) != 0) std::cerr << "Sample error (thermometer)" << std::endl;
+
+  return samp;
+}
+
+}; //namespace wxstation

@@ -24,42 +24,35 @@ SOFTWARE.
 
 #pragma once
 
-#include <cmath>
-#include <string>
-#include <iomanip>
 #include <iostream>
-#include <boost/date_time/local_time/local_time.hpp>
-#include <boost/date_time/date_facet.hpp>
 
-namespace pt = boost::posix_time;
+#include "helpers.hpp"
+#include "mpl3115a2.hpp"
+#include "si7021.hpp"
+#include "ds18b20.hpp"
+
 
 namespace wxstation {
-  /*Gets the current date/time*/
-  pt::ptime now();
 
-  /*RFC3399Nano returns a string representaton of the passed time.. EG like
-   * 2006-01-02T15:04:05.999999999Z07:00
-   * */
-  std::string RFC3399Nano( pt::ptime );
+int openDevice(std::string path);
+  /*WxStation contains the elements of a P, T, and RH measurements.
 
+  Simply create and call Measure to retrieve samples;
 
-  /*spinlock does nothing for the time asked for (in ms)
-   * */
-  void spinlock( int ms );
+  */
+class WxStation {
+public:
+  WxStation(std::string devicepath, std::string onewireID=""): i2cfd(openDevice(devicepath)), hyrgrometer(i2cfd), barometer(i2cfd), thermometer(onewireID) {}
+  ~WxStation() {
+    close(i2cfd);
+  }
+  sample Measure();
 
-  /* sample is a sample in time representing some sort of wx station measurement. */
-  class sample {
-    public:
-      sample(): pressure( NAN ), ptemperature( NAN ), humidity( NAN ), htemperature( NAN ), airtemperature( NAN ), when( now() ) {} //broken values
-      std::string json();
-      std::string  csv();
-      double pressure;
-      double ptemperature;
-      double humidity;
-      double htemperature;
-      double airtemperature;
-    private:
-      std::string nullforNan( double );
-      pt::ptime when;
-  };
-}
+private:
+  int i2cfd;
+  SI7021 hyrgrometer;
+  MPL3115A2 barometer;
+  DS18B20 thermometer;
+};
+
+}; //namespace wxstation

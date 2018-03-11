@@ -1,8 +1,32 @@
+/*
+MIT License
+
+Copyright (c) 2018 Nick Potts
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 #include "mpl3115a2.hpp"
 
 namespace pt = boost::posix_time;
 
-namespace MPL3115A2 {
+namespace wxstation {
 
   /*MPL3115A2 extracts measurements from a i2c bound MPL3115A2 device.
 
@@ -36,11 +60,11 @@ namespace MPL3115A2 {
   MPL3115A2::MPL3115A2( int fd, char reg1Val )
     : i2cfd( fd ), reg1( reg1Val ), sampleInit() {
     select();
-    char config[] = {CTRL_REG1, reg1Val};
+    char config[] = {mpl3115a2::CTRL_REG1, reg1Val};
     write( i2cfd, config, 2 ); // set register
 
     // set the flag register
-    char flags[] = {PT_DATA_CFG, 0x07};
+    char flags[] = {mpl3115a2::PT_DATA_CFG, 0x07};
     write( i2cfd, flags, 2 );
   }
 
@@ -55,33 +79,33 @@ namespace MPL3115A2 {
 
   void MPL3115A2::Initiate() {
     select();
-    char discarded[] = {CTRL_REG1};
+    char discarded[] = {mpl3115a2::CTRL_REG1};
     // read (and discard) from CTRL_REG1 sand then issue start
     write( i2cfd, discarded, 1 );
 
     // discard read, which resets sample state
     read( i2cfd, discarded, 1 );
 
-    char config[] = {CTRL_REG1, 0x1A};
+    char config[] = {mpl3115a2::CTRL_REG1, 0x1A};
     write( i2cfd, config, 2 ); // set registeri
-    sampleInit = timez::now();
+    sampleInit = now();
   }
 
-  int MPL3115A2::Sample( sample::sample &samp ) {
+  int MPL3115A2::Sample( sample &samp ) {
     int rd = 0;
     pt::ptime start;
     pt::time_duration max = pt::milliseconds( 70 );
     pt::time_duration atleast = pt::milliseconds( 335 );
     while ( 1 ) {
-      pt::time_duration elapsed = ( timez::now() - sampleInit );
+      pt::time_duration elapsed = ( now() - sampleInit );
       if ( elapsed > atleast ) break;
     }
 
     // Read the data
     select();
-    start = timez::now();
-    char w[] = {STATUS};
-    while ( timez::now() - start < max && rd != 1 ) {
+    start = now();
+    char w[] = {mpl3115a2::STATUS};
+    while ( now() - start < max && rd != 1 ) {
       rd = write( i2cfd, w, 1 ); // start from the status reg, and read from there to 6:
     }
     if ( rd != 1 ) {
@@ -89,9 +113,9 @@ namespace MPL3115A2 {
     }
 
     rd = 0;
-    start = timez::now();
+    start = now();
     unsigned char d[6] = {0, 0, 0, 0, 0, 0};
-    while ( timez::now() - start < max ) {
+    while ( now() - start < max ) {
       rd = read( i2cfd, d, 6 );
       if ( rd == 6 && ( d[0] & 0x08 ) ) {
         samp.pressure = ( double )( ( d[1] * ( 1 << 16 ) ) + ( d[2] * ( 1 << 8 ) ) +
@@ -104,4 +128,4 @@ namespace MPL3115A2 {
     }
     return rd;
   }
-};  // namespace MPL3115A2
+};  // namespace wxstation
