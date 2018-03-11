@@ -35,7 +35,7 @@ int main( int ac, char *av[] ) {
   
     while ( 1 ) {
       wxstation::sample sam = station.Measure();
-      std::cout << (csv ? sam.csv(): sam.json()) << std::endl;
+      std::cout << (csv ? sam.csv(): sam.json());
       if (delay) {
         sleep(delay);
       }
